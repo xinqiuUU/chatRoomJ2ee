@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>登录和聊天室</title>
+    <script src="js/vue.js"></script>
+    <script src="js/axios.js"></script>
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+        #left{
+            float: left;
+        }
+        #talk{
+            float: right;
+            width: 500px;
+            height: 600px;
+            border: 1px solid green;
+        }
+        #messages{
+            width: 480px;
+            height: 400px;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <h1>登录</h1>
+
+    <span v-if="!isLogin">
+        用户名:<input type="text" v-model="name" />
+        密码:<input type="password" v-model="pwd" />
+        验证码:<input type="text" v-model="valcode" />
+        <img src="code.action" width="100px" height="25px"/>
+        <button @click="login" >登录</button>
+        <button @click="register">注册</button>
+        <br />
+    </span>
+
+    <span v-else="isLogin" v-cloak>
+        欢迎您：{{name}}    <button @click="logout">安全退出</button>
+    </span>
+    <hr/>
+    <div id="left">
+        <video width="320px" height="240px" controls>
+            <source src="media/再中二的少年，总有一天也会被现实打败.mp4" type="video/mp4">
+            您的浏览器不支持video标签。
+        </video>
+    </div>
+    <div id="talk">
+        <div id="messages">
+            <span v-for="m in messages">
+                <span v-html="m">{{messages}}</span>
+            </span>
+        </div>
+        <div id="sendMessage">
+            悄悄的说:<textarea v-model="message" rows="5" cols="38">
+
+            </textarea><br/>
+            <input type="button" value="发送" @click="sendMessage" :disabled="this.isLogin==false">
+        </div>
+    </div>
+</div>
+    <script>
+        let app = new Vue({
+            el:'#app',
+            data: {
+                name: '',
+                pwd: '',
+                valcode: '',
+                isLogin: false,
+                messages: [],
+                message:'',
+            },
+            methods:{
+                sendMessage(){
+                    var params = new URLSearchParams();
+                    params.append("pwd",this.name);
+                    params.append("message",this.message);
+                    axios.post('message.action?op=sendMessage',params).then( result =>{
+                        this.message='';
+                    })
+                },
+                register(){
+                    var params = new URLSearchParams();
+                    params.append("name",this.name);
+                    params.append("pwd",this.pwd);
+                    axios.post('user.action?op=register',params).then( result =>{
+                        let jm = result.data;
+                        if (jm.code==1){
+                            alert("注册成功。。");
+                        }else {
+                            alert("注册失败,原因:"+jm.error);
+                        }
+                    })
+                },
+                logout(){
+                    axios.post('user.action?op=logout').then( result=>{
+                        let jm = result.data;
+                        if ( jm.code==1 ){
+                            this.isLogin=false;
+                            this.id="";
+                            this.name="";
+                            this.pwd="";
+                            this.valcode="";
+                        }else {
+                            this.isLogin=false;
+                        }
+                    });
+                },
+                login(){
+                    var params = new URLSearchParams();
+                    params.append("name",this.name);
+                    params.append("pwd",this.pwd);
+                    params.append("valcode",this.valcode);
+                    axios.post('user.action?op=login',params).then( result=>{
+                        let jm = result.data;
+                        if ( jm.code==1 ){
+                            this.isLogin=true;
+                        }else {
+                            alert(jm.error);
+                            this.isLogin=false;
+                        }
+                    });
+                },
+                getLoginStatus(){
+                    var params = new URLSearchParams();
+                    return axios.post("user.action?op=getLoginStatus",params);
+                },
+                getAllMessages(){
+                    var params = new URLSearchParams();
+                    return axios.post("message.action?op=getMessage",params);
+                }
+            },
+            //选择挂载点为mounted
+            mounted:function (){
+                //发起请求，去后台servlet获取所有书籍数据
+                //方案一 ：ajax
+                //方案二：fetch
+                //方案三：结合vue和axios模块来用
+                //需求：在页面一加载完，可能有很多要完成（要发出多个请求到servlet 如：请求所有的商品 ， 查看用户是否登录 ，获取购物车）
+                axios.all(  [  this.getLoginStatus(),this.getAllMessages() ] ).then(
+                    axios.spread(  (d1 , d2 ) => {
+                        //alert(  d1  );  d1:  header:响应头   data:{code:1,obj:[] }
+                        if (   d1.data.code == 1 ){
+                            this.isLogin=true;
+                            this.name = d1.data.obj.name;
+                            this.id = d1.data.obj.id;
+                        }
+                        if (  d2.data.code == 1 ){
+                            this.messages = d2.data.obj;
+                        }
+                    })
+                );
+            },
+
+
+        });
+
+        setInterval("getMessages()",5000);
+        function getMessages(){
+            var params = new URLSearchParams();
+            axios.post("message.action?op=getMessage",params).then( result => {
+                let jm = result.data;
+                if (jm.code == 1){
+                    app.$data.messages = jm.obj;
+                }
+            })
+        }
+    </script>
+</body>
+</html>
